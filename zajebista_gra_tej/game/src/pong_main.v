@@ -6,7 +6,7 @@ module pong_main
   parameter PLAYER_H = 3,
   parameter ALIEN_W = 3,
   parameter ALIEN_H = 3,
-  parameter SHOOT_RATE = 10_000 // Zmniejszone na czas symulacji!
+  parameter SHOOT_RATE = 10_000 // Pamiętaj: do testów na żywo zmienić na np. 150_000_000!
 )
 (
 	input wire        CLK,
@@ -77,20 +77,21 @@ module pong_main
   wire auto_shoot_tick = (shoot_timer == 0);
 
   //-----------------------------------------
-  // LOGIKA GRY (GRACZ, POCISK, KOSMICI)
+  // LOGIKA GRY (KOLIZJE, PUNKTY I GAME OVER)
   //-----------------------------------------
   reg [10:0] player_x, player_y;
   reg [10:0] bullet_x, bullet_y; 
   reg bullet_active;             
   
-  // NOWOŚĆ: Rejestry dla floty kosmitów
   reg [10:0] fleet_x, fleet_y;
-  reg fleet_dir;             // 0 = w prawo, 1 = w lewo
-  reg [3:0] alien_alive;     // 4 bity dla 4 kosmitów (1 = żyje, 0 = zniszczony)
-  reg [2:0] alien_tick_div;  // Dzielnik, żeby obcy poruszali się wolniej niż laser
+  reg fleet_dir;             
+  reg [3:0] alien_alive;     
+  reg [3:0] alien_tick_div;  // Przyspieszeni kosmici
   
   reg [3:0] score_thousands, score_hundreds, score_tens, score_ones;
   reg game_over; 
+  
+  integer j; // Zmienna pomocnicza do sprawdzania kolizji
 
   always @(posedge CLK or posedge RST) begin
     if(RST) begin
@@ -99,11 +100,8 @@ module pong_main
       
       bullet_active <= 0; bullet_x <= 0; bullet_y <= 0;
 
-      // Startowe pozycje obcych
-      fleet_x <= 10;
-      fleet_y <= 6;
-      fleet_dir <= 0;
-      alien_alive <= 4'b1111; // Wszyscy 4 kosmici żyją na starcie
+      fleet_x <= 10; fleet_y <= 6; fleet_dir <= 0;
+      alien_alive <= 4'b1111; 
       alien_tick_div <= 0;
 
       score_thousands <= 0; score_hundreds <= 0;
@@ -111,6 +109,7 @@ module pong_main
       level <= 0; game_over <= 0;
     end
     else if (game_over) begin
+      // RESTART GRY PO PORAŻCE
       if (move_right || move_left) begin
         player_x <= SCR_W/2 - (PLAYER_W/2);
         bullet_active <= 0;
@@ -135,32 +134,69 @@ module pong_main
         bullet_y <= player_y - 1;              
       end
 
-      // Zegar gry dla elementów ruchomych
+      // SPRAWDZANIE KOLIZJI POCISKU Z KOSMITAMI
+      if (bullet_active) begin
+        for (j = 0; j < 4; j = j + 1) begin
+          if (alien_alive[j] && 
+              bullet_x >= fleet_x + (j * 8) && bullet_x < fleet_x + (j * 8) + ALIEN_W &&
+              bullet_y >= fleet_y && bullet_y < fleet_y + ALIEN_H) begin
+                
+                alien_alive[j] <= 0; // Kosmita ginie
+                bullet_active <= 0;  // Pocisk wybucha
+                
+                // Naliczanie punktów (jak w starej wersji)
+                if (score_ones == 9) begin
+                  score_ones <= 0;
+                  if (score_tens == 9) begin
+                    score_tens <= 0;
+                    if (score_hundreds == 9) begin
+                      score_hundreds <= 0;
+                      if (score_thousands != 9) score_thousands <= score_thousands + 1;
+                    end else score_hundreds <= score_hundreds + 1;
+                  end else score_tens <= score_tens + 1;
+                end else score_ones <= score_ones + 1;
+          end
+        end
+      end
+
+      // WARUNEK WYGRANEJ FALI (Wszyscy kosmici martwi)
+      if (alien_alive == 4'b0000) begin
+        alien_alive <= 4'b1111;  // Wskrzeszamy kosmitów
+        fleet_x <= 10;
+        fleet_y <= 6;            // Wracają na górę
+        fleet_dir <= 0;
+        if (level < 9) level <= level + 1; // Zwiększamy poziom!
+      end
+
+      // WARUNEK PORAŻKI (GAME OVER - Kosmici wylądowali)
+      if (fleet_y + ALIEN_H >= player_y) begin
+        game_over <= 1;
+      end
+
+      // RUCH ELEMENTÓW (Tylko jeśli gra trwa)
       if(game_tick) begin
-        // 1. Ruch pocisku
+        // Ruch pocisku
         if (bullet_active) begin
           if (bullet_y > 0) bullet_y <= bullet_y - 1; 
           else bullet_active <= 0; 
         end
 
-        // 2. Aktualizacja dzielnika dla floty kosmitów
+        // Ruch floty kosmitów
         alien_tick_div <= alien_tick_div + 1;
-        
-        // 3. Ruch floty kosmitów (co np. 32 tyknięcia szybkiego zegara)
         if (alien_tick_div == 0) begin
           if (fleet_dir == 0) begin
-            // Ruch w prawo (Sprawdzamy prawą krawędź całej grupy: 3 przerwy po 8px + szerokość kosmity = 27)
-            if (fleet_x + 27 < SCR_W) fleet_x <= fleet_x + 2;
+            // W prawo (skok o 2 piksele)
+            if (fleet_x + 29 < SCR_W) fleet_x <= fleet_x + 2;
             else begin
-              fleet_dir <= 1;           // Odbicie w lewo
-              fleet_y <= fleet_y + 2;   // Zejście w dół
+              fleet_dir <= 1;           
+              fleet_y <= fleet_y + 2;   
             end
           end else begin
-            // Ruch w lewo
-            if (fleet_x > 0) fleet_x <= fleet_x - 2;
+            // W lewo (skok o 2 piksele)
+            if (fleet_x >= 2) fleet_x <= fleet_x - 2;
             else begin
-              fleet_dir <= 0;           // Odbicie w prawo
-              fleet_y <= fleet_y + 2;   // Zejście w dół
+              fleet_dir <= 0;           
+              fleet_y <= fleet_y + 2;   
             end
           end
         end
@@ -228,28 +264,32 @@ module pong_main
   //-----------------------------------------
   // GŁÓWNE RENDEROWANIE GRAFIKI
   //-----------------------------------------
-  integer i; // Zmienna do pętli for
+  integer i;
   always @(*) begin
     // Domyślne tło: Czarny kosmos
     RED = 8'h00; GREEN = 8'h00; BLUE = 8'h00;
 
-    // Rysowanie floty kosmitów
+    // Rysowanie floty kosmitów (Tylko jeśli żyją)
     for (i = 0; i < 4; i = i + 1) begin
       if (alien_alive[i]) begin
-        // Każdy kosmita jest oddalony o wielokrotność 8 pikseli od początku floty
         if (H_CNT >= fleet_x + (i * 8) && H_CNT < fleet_x + (i * 8) + ALIEN_W && 
             V_CNT >= fleet_y && V_CNT < fleet_y + ALIEN_H) begin
-          RED = 8'h00; GREEN = 8'hFF; BLUE = 8'h00; // Zielony kolor
+          RED = 8'h00; GREEN = 8'hFF; BLUE = 8'h00; // Zielony kosmita
         end
       end
     end
 
     // Rysowanie gracza (Statek)
+    // Zmienia kolor na czerwony podczas Game Over!
     if(H_CNT >= player_x && H_CNT < player_x + PLAYER_W && V_CNT >= player_y && V_CNT < player_y + PLAYER_H) begin
-      if (H_CNT == player_x + 2 && V_CNT == player_y) begin
-        RED = 8'h00; GREEN = 8'hFF; BLUE = 8'hFF; 
+      if (game_over) begin
+         RED = 8'hFF; GREEN = 8'h00; BLUE = 8'h00; // Zniszczony (Czerwony)
       end else begin
-        RED = 8'h00; GREEN = 8'h00; BLUE = 8'hFF;
+         if (H_CNT == player_x + 2 && V_CNT == player_y) begin
+           RED = 8'h00; GREEN = 8'hFF; BLUE = 8'hFF; 
+         end else begin
+           RED = 8'h00; GREEN = 8'h00; BLUE = 8'hFF;
+         end
       end
     end
 

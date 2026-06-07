@@ -1,4 +1,4 @@
-Active-HDL 15.0.261.9132 2026-06-07 16:14:06
+Active-HDL 15.0.261.9132 2026-06-07 16:38:38
 
 Elaboration top modules:
 Verilog Module                tb
@@ -16,3 +16,9 @@ Library                 | Comment
 -------------------------------------------------------------------------------------------
 game                    | None
 -------------------------------------------------------------------------------------------
+
+
+Simulation Options: asim -O5 +access +w_nets +accb +accr +access +r +m+tb tb
+
+
+The performance of simulation is reduced. Version Student Edition
