@@ -1,0 +1,91 @@
+[Project]
+Current Flow=Generic
+VCS=0
+version=4
+Current Config=compile
+[Configurations]
+compile=game
+[Library]
+game=.\game\game.lib
+[$LibMap$]
+game=.
+Active_lib=
+[Settings]
+FLOW_TYPE=HDL
+LANGUAGE=VERILOG
+REFRESH_FLOW=1
+FLOWTOOLS=NONE
+FAMILY=
+fileopenfolder=C:\My_Designs\zajebista_gra_tej\game\src
+NoTimingChecks=0
+NoTchkMsg=0
+EnableXtrace=0
+ENABLE_ADV_DATAFLOW=0
+SplitNetVectors=0
+disable_toggle_notifier_registers=0
+RetvalMemorySize=32
+StackMemorySize=32
+resolution=Auto
+VsimAdditionalOptions=
+delta_iterations_limit=5000
+AccessACCB=1
+AccessACCR=1
+AccessReadTopLevel=1
+AccessRead=0
+AccessReadWrite=0
+AccessReadWriteSLP=1
+SimulationAccessReadPaths=
+SimulationAccessReadModules=
+SimulationAccessReadWritePaths=
+SimulationAccessReadWriteModules=
+SimulationAccessNetsPaths=
+SimulationAccessNetsModules=
+[HierarchyViewer]
+HierarchyInformation=
+ShowHide=ShowTopLevel
+Selected=
+[Files]
+/ddr.v=-1
+/delay.v=-1
+/dev_i2c_phy.v=-1
+/dev_i2c_phy_bit.v=-1
+/dev_i2c_phy_scaler.v=-1
+/hdmi_i2c_cfg.v=-1
+/pll_75mhz.v=-1
+/pong_main.v=-1
+/pong_top.v=-1
+/tb.v=-1
+/uart_rx.v=-1
+/uart_tx.v=-1
+/vga_sync_gen.v=-1
+/vo_phy_ddr.v=-1
+[Files.Data]
+.\src\ddr.v=Verilog Source Code
+.\src\delay.v=Verilog Source Code
+.\src\dev_i2c_phy.v=Verilog Source Code
+.\src\dev_i2c_phy_bit.v=Verilog Source Code
+.\src\dev_i2c_phy_scaler.v=Verilog Source Code
+.\src\hdmi_i2c_cfg.v=Verilog Source Code
+.\src\pll_75mhz.v=Verilog Source Code
+.\src\pong_main.v=Verilog Source Code
+.\src\pong_top.v=Verilog Source Code
+.\src\tb.v=Verilog Source Code
+.\src\uart_rx.v=Verilog Source Code
+.\src\uart_tx.v=Verilog Source Code
+.\src\vga_sync_gen.v=Verilog Source Code
+.\src\vo_phy_ddr.v=Verilog Source Code
+[LocalVerilogSets]
+VerilogLanguage=9
+WarningPrnLevel=1
+OptimizationLevel=2
+ProtectLevel=0
+Strict=0
+VerilogNoSpecify=0
+EnableDebug=0
+ErrorOutputLimit=0
+[verilog]
+timescale/unit=1ps
+timescale/precision=1ps
+check_syntax_only=0
+identifiers_to_uppercase=0
+timescale/enable=0

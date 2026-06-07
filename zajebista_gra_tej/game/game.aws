@@ -1,0 +1,13 @@
+[Version]
+Version=15.0
+[Designs]
+game=game.adf
+[Settings]
+Active=game
+[Expand]
+game=1
+[Browser]
+sort=order
+mode=none
+[Order]
+order=1
