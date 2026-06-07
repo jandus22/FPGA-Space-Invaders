@@ -5,7 +5,8 @@ module pong_main
   parameter PLAYER_W = 5,
   parameter PLAYER_H = 3,
   parameter ALIEN_W = 3,
-  parameter ALIEN_H = 3
+  parameter ALIEN_H = 3,
+  parameter SHOOT_RATE = 10_000 // Czas między strzałami (Ok. 2 sekundy dla zegara 75MHz)
 )
 (
 	input wire        CLK,
@@ -37,8 +38,7 @@ module pong_main
 
   reg [3:0] level;
   
-  // ZEGAR GRY (Prędkość)
-  // UWAGA: Przy wgrywaniu na prawdziwą płytkę ustawić z powrotem na wyższe wartości!
+  // ZEGAR GRY (Prędkość spadania przeciwników / lotu pocisku)
   wire [31:0] current_speed = 2500 - (level * 200); 
   
   reg [31:0] tick_counter;
@@ -51,7 +51,7 @@ module pong_main
   end
 
   //-----------------------------------------
-  // OBSŁUGA ENKODERA (STEROWANIE)
+  // OBSŁUGA ENKODERA (STEROWANIE GRACZEM)
   //-----------------------------------------
   reg EncA_QA_d, EncA_QA_dd, EncA_QB_d;
   always @(posedge CLK) begin
@@ -65,26 +65,46 @@ module pong_main
   wire move_left  = enc_tick && (EncA_QB_d == 1'b1);
 
   //-----------------------------------------
-  // LOGIKA GRY (STAN GRACZA I PUNKTY)
+  // AUTOMATYCZNE STRZELANIE (TIMER)
+  //-----------------------------------------
+  reg [27:0] shoot_timer;
+  always @(posedge CLK or posedge RST) begin
+    if (RST) shoot_timer <= 0;
+    else if (shoot_timer >= SHOOT_RATE) shoot_timer <= 0;
+    else shoot_timer <= shoot_timer + 1;
+  end
+  
+  // Impuls wyzwalający strzał dokładnie co wyznaczony czas
+  wire auto_shoot_tick = (shoot_timer == 0);
+
+  //-----------------------------------------
+  // LOGIKA GRY (STAN GRACZA, POCISK I PUNKTY)
   //-----------------------------------------
   reg [10:0] player_x, player_y;
+  reg [10:0] bullet_x, bullet_y; // Pozycja pocisku
+  reg bullet_active;             // Czy pocisk jest na ekranie?
+  
   reg [3:0] score_thousands, score_hundreds, score_tens, score_ones;
   reg game_over; 
 
   always @(posedge CLK or posedge RST) begin
     if(RST) begin
       player_x <= SCR_W/2 - (PLAYER_W/2);
-      player_y <= SCR_H - PLAYER_H - 2; // Gracz blisko dolnej krawędzi
+      player_y <= SCR_H - PLAYER_H - 2; 
       
+      bullet_active <= 0;
+      bullet_x <= 0;
+      bullet_y <= 0;
+
       score_thousands <= 0; score_hundreds <= 0;
       score_tens <= 0; score_ones <= 0;
       level <= 0;
       game_over <= 0;
     end
     else if (game_over) begin
-      // Restart po ewentualnym Game Over (Na razie wyłączony, bo nie ma wrogów)
       if (move_right || move_left) begin
         player_x <= SCR_W/2 - (PLAYER_W/2);
+        bullet_active <= 0;
         score_thousands <= 0; score_hundreds <= 0;
         score_tens <= 0; score_ones <= 0;
         level <= 0;
@@ -92,13 +112,24 @@ module pong_main
       end
     end
     else begin
-      // Poruszanie się statkiem lewo/prawo z blokadą krawędzi ekranu
+      // Poruszanie się statkiem
       if (move_right && player_x < SCR_W - PLAYER_W) player_x <= player_x + 1;
       else if (move_left && player_x > 0)            player_x <= player_x - 1;
 
-      // Tutaj w przyszłości dodamy tick_counter do poruszania wrogami i pociskami
+      // Generowanie strzału (Teraz w pełni automatyczne!)
+      if (auto_shoot_tick && !bullet_active) begin
+        bullet_active <= 1;
+        bullet_x <= player_x + (PLAYER_W / 2); // Strzał ze środka statku
+        bullet_y <= player_y - 1;              // Start tuż nad statkiem
+      end
+
+      // Ruch elementów zależny od zegara gry
       if(game_tick) begin
-        // Puste miejsce na logikę czasu gry
+        // Ruch pocisku (Leci z dołu do góry, czyli wartość Y maleje)
+        if (bullet_active) begin
+          if (bullet_y > 0) bullet_y <= bullet_y - 1; 
+          else bullet_active <= 0; // Usuń pocisk, jeśli wyleciał za ekran
+        end
       end
     end
   end
@@ -170,12 +201,15 @@ module pong_main
     // Rysowanie gracza (Statek)
     if(H_CNT >= player_x && H_CNT < player_x + PLAYER_W && V_CNT >= player_y && V_CNT < player_y + PLAYER_H) begin
       if (H_CNT == player_x + 2 && V_CNT == player_y) begin
-        // Środkowy, górny piksel (dziób statku) na jasnoniebieski
         RED = 8'h00; GREEN = 8'hFF; BLUE = 8'hFF; 
       end else begin
-        // Reszta kadłuba na niebiesko
         RED = 8'h00; GREEN = 8'h00; BLUE = 8'hFF;
       end
+    end
+
+    // Rysowanie pocisku (Biały laser)
+    if (bullet_active && H_CNT == bullet_x && V_CNT == bullet_y) begin
+        RED = 8'hFF; GREEN = 8'hFF; BLUE = 8'hFF;
     end
 
     // Rysowanie UI (Punkty i Level) na żółto
