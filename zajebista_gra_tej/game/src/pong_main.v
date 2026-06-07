@@ -6,7 +6,8 @@ module pong_main
   parameter PLAYER_H = 3,
   parameter ALIEN_W = 3,
   parameter ALIEN_H = 3,
-  parameter SHOOT_RATE = 10_000 // Pamiętaj: do testów na żywo zmienić na np. 150_000_000!
+  parameter SHOOT_RATE = 10_000, // Zmień na np. 150_000_000 przy wgrywaniu na płytkę
+  parameter BULLET_SPEED = 800   // Niezależna prędkość pocisku
 )
 (
 	input wire        CLK,
@@ -36,10 +37,28 @@ module pong_main
     
   assign LED = heartbeat[26:23];
 
+  //-----------------------------------------
+  // ZEGARY I PRĘDKOŚĆ
+  //-----------------------------------------
   reg [3:0] level;
   
-  // ZEGAR GRY
-  wire [31:0] current_speed = 2500 - (level * 200); 
+  // ZEGAR GRY (Ruch kosmitów - przyspiesza 1.5x co poziom)
+  reg [31:0] current_speed;
+  always @(*) begin
+    case(level)
+      4'd0: current_speed = 32'd2500;
+      4'd1: current_speed = 32'd1667; 
+      4'd2: current_speed = 32'd1111; 
+      4'd3: current_speed = 32'd741;  
+      4'd4: current_speed = 32'd494;  
+      4'd5: current_speed = 32'd329;  
+      4'd6: current_speed = 32'd219;  
+      4'd7: current_speed = 32'd146;  
+      4'd8: current_speed = 32'd98;   
+      4'd9: current_speed = 32'd65;   
+      default: current_speed = 32'd2500;
+    endcase
+  end
   
   reg [31:0] tick_counter;
   wire game_tick = (tick_counter >= current_speed);
@@ -48,6 +67,16 @@ module pong_main
     if (RST) tick_counter <= 0;
     else if (game_tick) tick_counter <= 0;
     else tick_counter <= tick_counter + 1;
+  end
+
+  // Niezależny, szybki zegar dla pocisku
+  reg [31:0] bullet_tick_counter;
+  wire bullet_tick = (bullet_tick_counter >= BULLET_SPEED);
+
+  always @(posedge CLK or posedge RST) begin
+    if (RST) bullet_tick_counter <= 0;
+    else if (bullet_tick) bullet_tick_counter <= 0;
+    else bullet_tick_counter <= bullet_tick_counter + 1;
   end
 
   //-----------------------------------------
@@ -86,12 +115,12 @@ module pong_main
   reg [10:0] fleet_x, fleet_y;
   reg fleet_dir;             
   reg [3:0] alien_alive;     
-  reg [3:0] alien_tick_div;  
+  reg [3:0] alien_tick_div;
   
   reg [3:0] score_thousands, score_hundreds, score_tens, score_ones;
   reg game_over; 
   
-  integer j; 
+  integer j;
 
   always @(posedge CLK or posedge RST) begin
     if(RST) begin
@@ -100,7 +129,8 @@ module pong_main
       
       bullet_active <= 0; bullet_x <= 0; bullet_y <= 0;
 
-      fleet_x <= 10; fleet_y <= 6; fleet_dir <= 0;
+      fleet_x <= 10;
+      fleet_y <= 6; fleet_dir <= 0;
       alien_alive <= 4'b1111; 
       alien_tick_div <= 0;
 
@@ -109,6 +139,7 @@ module pong_main
       level <= 0; game_over <= 0;
     end
     else if (game_over) begin
+      // RESTART GRY PO PORAŻCE
       if (move_right || move_left) begin
         player_x <= SCR_W/2 - (PLAYER_W/2);
         bullet_active <= 0;
@@ -116,30 +147,35 @@ module pong_main
         fleet_x <= 10; fleet_y <= 6; fleet_dir <= 0;
         alien_alive <= 4'b1111;
         
-        score_thousands <= 0; score_hundreds <= 0;
+        score_thousands <= 0;
+        score_hundreds <= 0;
         score_tens <= 0; score_ones <= 0;
         level <= 0; game_over <= 0;
       end
     end
     else begin
+      // Sterowanie
       if (move_right && player_x < SCR_W - PLAYER_W) player_x <= player_x + 1;
       else if (move_left && player_x > 0)            player_x <= player_x - 1;
 
+      // Strzał
       if (auto_shoot_tick && !bullet_active) begin
         bullet_active <= 1;
         bullet_x <= player_x + (PLAYER_W / 2); 
-        bullet_y <= player_y - 1;              
+        bullet_y <= player_y - 1;
       end
 
+      // Kolizje
       if (bullet_active) begin
         for (j = 0; j < 4; j = j + 1) begin
           if (alien_alive[j] && 
               bullet_x >= fleet_x + (j * 8) && bullet_x < fleet_x + (j * 8) + ALIEN_W &&
               bullet_y >= fleet_y && bullet_y < fleet_y + ALIEN_H) begin
-                
-                alien_alive[j] <= 0; 
+     
+                alien_alive[j] <= 0;
                 bullet_active <= 0;  
                 
+                // Naliczanie punktów
                 if (score_ones == 9) begin
                   score_ones <= 0;
                   if (score_tens == 9) begin
@@ -154,36 +190,42 @@ module pong_main
         end
       end
 
+      // Przejście na następny poziom
       if (alien_alive == 4'b0000) begin
-        alien_alive <= 4'b1111;  
+        alien_alive <= 4'b1111;
         fleet_x <= 10;
         fleet_y <= 6;            
         fleet_dir <= 0;
-        if (level < 9) level <= level + 1; 
+        if (level < 9) level <= level + 1;
       end
 
+      // Warunek porażki
       if (fleet_y + ALIEN_H >= player_y) begin
         game_over <= 1;
       end
 
-      if(game_tick) begin
+      // NIEZALEŻNY RUCH POCISKU
+      if (bullet_tick) begin
         if (bullet_active) begin
-          if (bullet_y > 0) bullet_y <= bullet_y - 1; 
+          if (bullet_y > 0) bullet_y <= bullet_y - 1;
           else bullet_active <= 0; 
         end
+      end
 
+      // RUCH KOSMITÓW
+      if(game_tick) begin
         alien_tick_div <= alien_tick_div + 1;
         if (alien_tick_div == 0) begin
           if (fleet_dir == 0) begin
             if (fleet_x + 29 < SCR_W) fleet_x <= fleet_x + 2;
             else begin
-              fleet_dir <= 1;           
+              fleet_dir <= 1;
               fleet_y <= fleet_y + 2;   
             end
           end else begin
             if (fleet_x >= 2) fleet_x <= fleet_x - 2;
             else begin
-              fleet_dir <= 0;           
+              fleet_dir <= 0;
               fleet_y <= fleet_y + 2;   
             end
           end
@@ -202,7 +244,7 @@ module pong_main
   wire is_char_L      = (H_CNT >= 2  && H_CNT <= 4  && V_CNT >= 1 && V_CNT <= 5);
   wire is_level_digit = (H_CNT >= 6  && H_CNT <= 8  && V_CNT >= 1 && V_CNT <= 5);
   wire is_text_area = is_score_thou | is_score_hund | is_score_tens | is_score_ones | is_char_L | is_level_digit;
-
+  
   wire [3:0] cur_digit = is_score_thou  ? score_thousands :
                          is_score_hund  ? score_hundreds  :
                          is_score_tens  ? score_tens      :
@@ -248,8 +290,8 @@ module pong_main
 
   wire blink_state = heartbeat[16]; 
   wire show_score = (!game_over) || blink_state;
-
-  // NOWOŚĆ: Statyczna mapa gwiazd
+  
+  // Statyczna mapa gwiazd
   wire is_star = (H_CNT == 3  && V_CNT == 8 ) || (H_CNT == 12 && V_CNT == 4 ) ||
                  (H_CNT == 27 && V_CNT == 2 ) || (H_CNT == 42 && V_CNT == 6 ) ||
                  (H_CNT == 58 && V_CNT == 3 ) || (H_CNT == 8  && V_CNT == 14) ||
@@ -266,27 +308,27 @@ module pong_main
   //-----------------------------------------
   integer i;
   always @(*) begin
-    // Rysowanie tła: jeśli to piksel gwiazdy - dajemy szary, jeśli nie - czarna próżnia
+    // Tło z gwiazdami
     if (is_star) begin
-        RED = 8'hFF; GREEN = 8'hFF; BLUE = 8'hFF; // biały
+        RED = 8'hFF; GREEN = 8'hFF; BLUE = 8'hFF; // Białe gwiazdy
     end else begin
         RED = 8'h00; GREEN = 8'h00; BLUE = 8'h00; // Czerń
     end
 
-    // Rysowanie floty kosmitów
+    // Flota kosmitów
     for (i = 0; i < 4; i = i + 1) begin
       if (alien_alive[i]) begin
         if (H_CNT >= fleet_x + (i * 8) && H_CNT < fleet_x + (i * 8) + ALIEN_W && 
             V_CNT >= fleet_y && V_CNT < fleet_y + ALIEN_H) begin
-          RED = 8'h00; GREEN = 8'hFF; BLUE = 8'h00; 
+          RED = 8'h00; GREEN = 8'hFF; BLUE = 8'h00; // Zieloni
         end
       end
     end
 
-    // Rysowanie gracza
+    // Gracz
     if(H_CNT >= player_x && H_CNT < player_x + PLAYER_W && V_CNT >= player_y && V_CNT < player_y + PLAYER_H) begin
       if (game_over) begin
-         RED = 8'hFF; GREEN = 8'h00; BLUE = 8'h00; 
+         RED = 8'hFF; GREEN = 8'h00; BLUE = 8'h00; // Czerwony jak zniszczony
       end else begin
          if (H_CNT == player_x + 2 && V_CNT == player_y) begin
            RED = 8'h00; GREEN = 8'hFF; BLUE = 8'hFF; 
@@ -296,12 +338,12 @@ module pong_main
       end
     end
 
-    // Rysowanie pocisku 
+    // Pocisk
     if (bullet_active && H_CNT == bullet_x && V_CNT == bullet_y) begin
-        RED = 8'hFF; GREEN = 8'hFF; BLUE = 8'h00;
+        RED = 8'hFF; GREEN = 8'hFF; BLUE = 8'h00; // Żółty/Biały pocisk
     end
 
-    // Rysowanie UI 
+    // UI
     if (draw_text_pixel && show_score) begin
         RED = 8'hFF; GREEN = 8'hFF; BLUE = 8'h00;
     end

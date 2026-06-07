@@ -705,3 +705,170 @@ run
 endsim
 # KERNEL: stopped at time: 147601548600 ps
 # VSIM: Simulation has finished.
+alog -O2 -sve -msg 5 -sv2k17 -work game $dsn/src/ddr.v $dsn/src/delay.v $dsn/src/dev_i2c_phy.v $dsn/src/dev_i2c_phy_bit.v $dsn/src/dev_i2c_phy_scaler.v $dsn/src/hdmi_i2c_cfg.v $dsn/src/pll_75mhz.v $dsn/src/pong_main.v $dsn/src/pong_top.v $dsn/src/tb.v $dsn/src/uart_rx.v $dsn/src/uart_tx.v $dsn/src/vga_sync_gen.v $dsn/src/vo_phy_ddr.v
+# Warning: VCP2515 ddr.v : (25, 49): Undefined module: OB was used. Port connection rules will not be checked at such instantiations.
+# Warning: VCP2515 ddr.v : (28, 25): Undefined module: ODDRXE was used. Port connection rules will not be checked at such instantiations.
+# Warning: VCP2515 ddr.v : (30, 40): Undefined module: VLO was used. Port connection rules will not be checked at such instantiations.
+# Warning: VCP2515 ddr.v : (32, 40): Undefined module: VHI was used. Port connection rules will not be checked at such instantiations.
+# Warning: VCP2515 pll_75mhz.v : (87, 47): Undefined module: EHXPLLJ was used. Port connection rules will not be checked at such instantiations.
+# Unit top modules: pong_top tb uart_rx uart_tx.
+# Compile success 0 Errors 5 Warnings  Analysis time: 0[s].
+# done
+asim -O5 +access +w_nets +accb +accr +access +r +m+tb tb
+# ELBREAD: Elaboration process.
+# ELBREAD: Elaboration time 0.0 [s].
+# VSIM: Stack memory: 32MB
+# VSIM: Retval memory: 32MB
+# 
+# KERNEL: Main thread initiated.
+# KERNEL: Kernel process initialization phase.
+# ELAB2: Elaboration final pass...
+# ELAB2: Create instances ...
+# KERNEL: Time resolution set to 1ps.
+# ELAB2: Create instances complete.
+# SLP: Started
+# SLP: Elaboration phase ...
+# SLP: Elaboration phase ... done : 0.0 [s]
+# SLP: Generation phase ...
+# SLP: Generation phase ... done : 0.2 [s]
+# SLP: Finished : 0.3 [s]
+# SLP: 0 primitives and 28 (100.00%) other processes in SLP
+# SLP: 0 signals in SLP and 79 (100.00%) interface signals
+# ELAB2: Elaboration final pass complete - time: 0.3 [s].
+# KERNEL: SLP loading done - time: 0.0 [s].
+# KERNEL: Warning: You are using the Active-HDL Student Edition. The performance of simulation is running at a reduced rate.
+# KERNEL: Warning: Contact Aldec for available upgrade options - sales@aldec.com.
+# KERNEL: SLP simulation initialization done - time: 0.0 [s].
+# KERNEL: Kernel process initialization done.
+# Allocation: Simulator allocated 5439 kB (elbread=427 elab2=4876 kernel=135 sdf=0)
+# KERNEL: ASDB file was created in location C:\My_Designs\FPGA-Space-Invaders\zajebista_gra_tej\game\src\wave.asdb
+#  17:05, niedziela, 7 czerwca 2026
+#  Simulation has been initialized
+run
+endsim
+# KERNEL: stopped at time: 287321192400 ps
+# VSIM: Simulation has finished.
+asim -O5 +access +w_nets +accb +accr +access +r +m+tb tb
+# ELBREAD: Elaboration process.
+# ELBREAD: Elaboration time 0.0 [s].
+# VSIM: Stack memory: 32MB
+# VSIM: Retval memory: 32MB
+# 
+alog -O2 -sve -msg 5 -sv2k17 -work game $dsn/src/pong_main.v
+# Compile success 0 Errors 0 Warnings  Analysis time: 0[s].
+# done
+# ELBREAD: Elaboration process.
+# ELBREAD: Warning: ELBREAD_0049 The "pong_main" design unit does not have a time unit/precision defined but other design units do.
+# ELBREAD: Elaboration time 0.0 [s].
+# KERNEL: Main thread initiated.
+# KERNEL: Kernel process initialization phase.
+# ELAB2: Elaboration final pass...
+# ELAB2: Create instances ...
+# KERNEL: Time resolution set to 100ps.
+# ELAB2: Create instances complete.
+# SLP: Started
+# SLP: Elaboration phase ...
+# SLP: Elaboration phase ... done : 0.0 [s]
+# SLP: Generation phase ...
+# SLP: Generation phase ... done : 0.2 [s]
+# SLP: Finished : 0.3 [s]
+# SLP: 0 primitives and 28 (100.00%) other processes in SLP
+# SLP: 0 signals in SLP and 79 (100.00%) interface signals
+# ELAB2: Elaboration final pass complete - time: 0.3 [s].
+# KERNEL: SLP loading done - time: 0.0 [s].
+# KERNEL: Warning: You are using the Active-HDL Student Edition. The performance of simulation is running at a reduced rate.
+# KERNEL: Warning: Contact Aldec for available upgrade options - sales@aldec.com.
+# KERNEL: SLP simulation initialization done - time: 0.0 [s].
+# KERNEL: Kernel process initialization done.
+# Allocation: Simulator allocated 5439 kB (elbread=427 elab2=4876 kernel=135 sdf=0)
+# KERNEL: ASDB file was created in location C:\My_Designs\FPGA-Space-Invaders\zajebista_gra_tej\game\src\wave.asdb
+#  17:21, niedziela, 7 czerwca 2026
+#  Simulation has been initialized
+run
+endsim
+# KERNEL: stopped at time: 98514193800 ps
+# VSIM: Simulation has finished.
+asim -O5 +access +w_nets +accb +accr +access +r +m+tb tb
+# ELBREAD: Elaboration process.
+# ELBREAD: Warning: ELBREAD_0049 The "pong_main" design unit does not have a time unit/precision defined but other design units do.
+# ELBREAD: Elaboration time 0.0 [s].
+# VSIM: Stack memory: 32MB
+# VSIM: Retval memory: 32MB
+# 
+alog -O2 -sve -msg 5 -sv2k17 -work game $dsn/src/pong_main.v
+# Compile success 0 Errors 0 Warnings  Analysis time: 0[s].
+# done
+# ELBREAD: Elaboration process.
+# ELBREAD: Warning: ELBREAD_0049 The "pong_main" design unit does not have a time unit/precision defined but other design units do.
+# ELBREAD: Elaboration time 0.0 [s].
+# KERNEL: Main thread initiated.
+# KERNEL: Kernel process initialization phase.
+# ELAB2: Elaboration final pass...
+# ELAB2: Create instances ...
+# KERNEL: Time resolution set to 100ps.
+# ELAB2: Create instances complete.
+# SLP: Started
+# SLP: Elaboration phase ...
+# SLP: Elaboration phase ... done : 0.0 [s]
+# SLP: Generation phase ...
+# SLP: Generation phase ... done : 0.2 [s]
+# SLP: Finished : 0.3 [s]
+# SLP: 0 primitives and 29 (100.00%) other processes in SLP
+# SLP: 0 signals in SLP and 81 (100.00%) interface signals
+# ELAB2: Elaboration final pass complete - time: 0.3 [s].
+# KERNEL: SLP loading done - time: 0.0 [s].
+# KERNEL: Warning: You are using the Active-HDL Student Edition. The performance of simulation is running at a reduced rate.
+# KERNEL: Warning: Contact Aldec for available upgrade options - sales@aldec.com.
+# KERNEL: SLP simulation initialization done - time: 0.0 [s].
+# KERNEL: Kernel process initialization done.
+# Allocation: Simulator allocated 5440 kB (elbread=427 elab2=4876 kernel=135 sdf=0)
+# KERNEL: ASDB file was created in location C:\My_Designs\FPGA-Space-Invaders\zajebista_gra_tej\game\src\wave.asdb
+#  17:30, niedziela, 7 czerwca 2026
+#  Simulation has been initialized
+run
+endsim
+# KERNEL: stopped at time: 147191477400 ps
+# VSIM: Simulation has finished.
+alog -O2 -sve -msg 5 -sv2k17 -work game $dsn/src/ddr.v $dsn/src/delay.v $dsn/src/dev_i2c_phy.v $dsn/src/dev_i2c_phy_bit.v $dsn/src/dev_i2c_phy_scaler.v $dsn/src/hdmi_i2c_cfg.v $dsn/src/pll_75mhz.v $dsn/src/pong_main.v $dsn/src/pong_top.v $dsn/src/tb.v $dsn/src/uart_rx.v $dsn/src/uart_tx.v $dsn/src/vga_sync_gen.v $dsn/src/vo_phy_ddr.v
+# Warning: VCP2515 ddr.v : (25, 49): Undefined module: OB was used. Port connection rules will not be checked at such instantiations.
+# Warning: VCP2515 ddr.v : (28, 25): Undefined module: ODDRXE was used. Port connection rules will not be checked at such instantiations.
+# Warning: VCP2515 ddr.v : (30, 40): Undefined module: VLO was used. Port connection rules will not be checked at such instantiations.
+# Warning: VCP2515 ddr.v : (32, 40): Undefined module: VHI was used. Port connection rules will not be checked at such instantiations.
+# Warning: VCP2515 pll_75mhz.v : (87, 47): Undefined module: EHXPLLJ was used. Port connection rules will not be checked at such instantiations.
+# Unit top modules: pong_top tb uart_rx uart_tx.
+# Compile success 0 Errors 5 Warnings  Analysis time: 0[s].
+# done
+asim -O5 +access +w_nets +accb +accr +access +r +m+tb tb
+# ELBREAD: Elaboration process.
+# ELBREAD: Elaboration time 0.0 [s].
+# VSIM: Stack memory: 32MB
+# VSIM: Retval memory: 32MB
+# 
+# KERNEL: Main thread initiated.
+# KERNEL: Kernel process initialization phase.
+# ELAB2: Elaboration final pass...
+# ELAB2: Create instances ...
+# KERNEL: Time resolution set to 1ps.
+# ELAB2: Create instances complete.
+# SLP: Started
+# SLP: Elaboration phase ...
+# SLP: Elaboration phase ... done : 0.0 [s]
+# SLP: Generation phase ...
+# SLP: Generation phase ... done : 0.7 [s]
+# SLP: Finished : 0.7 [s]
+# SLP: 0 primitives and 29 (100.00%) other processes in SLP
+# SLP: 0 signals in SLP and 81 (100.00%) interface signals
+# ELAB2: Elaboration final pass complete - time: 0.8 [s].
+# KERNEL: SLP loading done - time: 0.0 [s].
+# KERNEL: Warning: You are using the Active-HDL Student Edition. The performance of simulation is running at a reduced rate.
+# KERNEL: Warning: Contact Aldec for available upgrade options - sales@aldec.com.
+# KERNEL: SLP simulation initialization done - time: 0.0 [s].
+# KERNEL: Kernel process initialization done.
+# Allocation: Simulator allocated 5440 kB (elbread=427 elab2=4876 kernel=135 sdf=0)
+# KERNEL: ASDB file was created in location C:\My_Designs\FPGA-Space-Invaders\zajebista_gra_tej\game\src\wave.asdb
+#  23:27, niedziela, 7 czerwca 2026
+#  Simulation has been initialized
+run
+endsim
+# KERNEL: stopped at time: 17461481400 ps
+# VSIM: Simulation has finished.
