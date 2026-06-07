@@ -6,7 +6,7 @@ module pong_main
   parameter PLAYER_H = 3,
   parameter ALIEN_W = 3,
   parameter ALIEN_H = 3,
-  parameter SHOOT_RATE = 10_000 // Czas między strzałami (Ok. 2 sekundy dla zegara 75MHz)
+  parameter SHOOT_RATE = 10_000 // Zmniejszone na czas symulacji!
 )
 (
 	input wire        CLK,
@@ -38,7 +38,7 @@ module pong_main
 
   reg [3:0] level;
   
-  // ZEGAR GRY (Prędkość spadania przeciwników / lotu pocisku)
+  // ZEGAR GRY
   wire [31:0] current_speed = 2500 - (level * 200); 
   
   reg [31:0] tick_counter;
@@ -74,15 +74,20 @@ module pong_main
     else shoot_timer <= shoot_timer + 1;
   end
   
-  // Impuls wyzwalający strzał dokładnie co wyznaczony czas
   wire auto_shoot_tick = (shoot_timer == 0);
 
   //-----------------------------------------
-  // LOGIKA GRY (STAN GRACZA, POCISK I PUNKTY)
+  // LOGIKA GRY (GRACZ, POCISK, KOSMICI)
   //-----------------------------------------
   reg [10:0] player_x, player_y;
-  reg [10:0] bullet_x, bullet_y; // Pozycja pocisku
-  reg bullet_active;             // Czy pocisk jest na ekranie?
+  reg [10:0] bullet_x, bullet_y; 
+  reg bullet_active;             
+  
+  // NOWOŚĆ: Rejestry dla floty kosmitów
+  reg [10:0] fleet_x, fleet_y;
+  reg fleet_dir;             // 0 = w prawo, 1 = w lewo
+  reg [3:0] alien_alive;     // 4 bity dla 4 kosmitów (1 = żyje, 0 = zniszczony)
+  reg [2:0] alien_tick_div;  // Dzielnik, żeby obcy poruszali się wolniej niż laser
   
   reg [3:0] score_thousands, score_hundreds, score_tens, score_ones;
   reg game_over; 
@@ -92,43 +97,72 @@ module pong_main
       player_x <= SCR_W/2 - (PLAYER_W/2);
       player_y <= SCR_H - PLAYER_H - 2; 
       
-      bullet_active <= 0;
-      bullet_x <= 0;
-      bullet_y <= 0;
+      bullet_active <= 0; bullet_x <= 0; bullet_y <= 0;
+
+      // Startowe pozycje obcych
+      fleet_x <= 10;
+      fleet_y <= 6;
+      fleet_dir <= 0;
+      alien_alive <= 4'b1111; // Wszyscy 4 kosmici żyją na starcie
+      alien_tick_div <= 0;
 
       score_thousands <= 0; score_hundreds <= 0;
       score_tens <= 0; score_ones <= 0;
-      level <= 0;
-      game_over <= 0;
+      level <= 0; game_over <= 0;
     end
     else if (game_over) begin
       if (move_right || move_left) begin
         player_x <= SCR_W/2 - (PLAYER_W/2);
         bullet_active <= 0;
+        
+        fleet_x <= 10; fleet_y <= 6; fleet_dir <= 0;
+        alien_alive <= 4'b1111;
+        
         score_thousands <= 0; score_hundreds <= 0;
         score_tens <= 0; score_ones <= 0;
-        level <= 0;
-        game_over <= 0;
+        level <= 0; game_over <= 0;
       end
     end
     else begin
-      // Poruszanie się statkiem
+      // Sterowanie statkiem
       if (move_right && player_x < SCR_W - PLAYER_W) player_x <= player_x + 1;
       else if (move_left && player_x > 0)            player_x <= player_x - 1;
 
-      // Generowanie strzału (Teraz w pełni automatyczne!)
+      // Generowanie strzału
       if (auto_shoot_tick && !bullet_active) begin
         bullet_active <= 1;
-        bullet_x <= player_x + (PLAYER_W / 2); // Strzał ze środka statku
-        bullet_y <= player_y - 1;              // Start tuż nad statkiem
+        bullet_x <= player_x + (PLAYER_W / 2); 
+        bullet_y <= player_y - 1;              
       end
 
-      // Ruch elementów zależny od zegara gry
+      // Zegar gry dla elementów ruchomych
       if(game_tick) begin
-        // Ruch pocisku (Leci z dołu do góry, czyli wartość Y maleje)
+        // 1. Ruch pocisku
         if (bullet_active) begin
           if (bullet_y > 0) bullet_y <= bullet_y - 1; 
-          else bullet_active <= 0; // Usuń pocisk, jeśli wyleciał za ekran
+          else bullet_active <= 0; 
+        end
+
+        // 2. Aktualizacja dzielnika dla floty kosmitów
+        alien_tick_div <= alien_tick_div + 1;
+        
+        // 3. Ruch floty kosmitów (co np. 32 tyknięcia szybkiego zegara)
+        if (alien_tick_div == 0) begin
+          if (fleet_dir == 0) begin
+            // Ruch w prawo (Sprawdzamy prawą krawędź całej grupy: 3 przerwy po 8px + szerokość kosmity = 27)
+            if (fleet_x + 27 < SCR_W) fleet_x <= fleet_x + 2;
+            else begin
+              fleet_dir <= 1;           // Odbicie w lewo
+              fleet_y <= fleet_y + 2;   // Zejście w dół
+            end
+          end else begin
+            // Ruch w lewo
+            if (fleet_x > 0) fleet_x <= fleet_x - 2;
+            else begin
+              fleet_dir <= 0;           // Odbicie w prawo
+              fleet_y <= fleet_y + 2;   // Zejście w dół
+            end
+          end
         end
       end
     end
@@ -194,9 +228,21 @@ module pong_main
   //-----------------------------------------
   // GŁÓWNE RENDEROWANIE GRAFIKI
   //-----------------------------------------
+  integer i; // Zmienna do pętli for
   always @(*) begin
     // Domyślne tło: Czarny kosmos
     RED = 8'h00; GREEN = 8'h00; BLUE = 8'h00;
+
+    // Rysowanie floty kosmitów
+    for (i = 0; i < 4; i = i + 1) begin
+      if (alien_alive[i]) begin
+        // Każdy kosmita jest oddalony o wielokrotność 8 pikseli od początku floty
+        if (H_CNT >= fleet_x + (i * 8) && H_CNT < fleet_x + (i * 8) + ALIEN_W && 
+            V_CNT >= fleet_y && V_CNT < fleet_y + ALIEN_H) begin
+          RED = 8'h00; GREEN = 8'hFF; BLUE = 8'h00; // Zielony kolor
+        end
+      end
+    end
 
     // Rysowanie gracza (Statek)
     if(H_CNT >= player_x && H_CNT < player_x + PLAYER_W && V_CNT >= player_y && V_CNT < player_y + PLAYER_H) begin

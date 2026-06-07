@@ -38,8 +38,8 @@ FileTimeLow=2020954643
 FileTimeHigh=31258212
 Status=Modified
 [COMPILESTATUS|.\src\pong_main.v]
-FileTimeLow=3404621171
-FileTimeHigh=31258244
+FileTimeLow=3785549568
+FileTimeHigh=31258247
 Status=Compiled
 [COMPILESTATUS|.\src\pong_top.v]
 FileTimeLow=2021015924
