@@ -6,8 +6,8 @@ module pong_main
   parameter PLAYER_H = 3,
   parameter ALIEN_W = 3,
   parameter ALIEN_H = 3,
-  parameter SHOOT_RATE = 10_000, // Zmień na np. 150_000_000 przy wgrywaniu na płytkę
-  parameter BULLET_SPEED = 800   // Niezależna prędkość pocisku
+  parameter SHOOT_RATE = 10_000, 
+  parameter BULLET_SPEED = 800   
 )
 (
 	input wire        CLK,
@@ -41,8 +41,6 @@ module pong_main
   // ZEGARY I PRĘDKOŚĆ
   //-----------------------------------------
   reg [3:0] level;
-  
-  // ZEGAR GRY (Ruch kosmitów - przyspiesza 1.5x co poziom)
   reg [31:0] current_speed;
   always @(*) begin
     case(level)
@@ -69,7 +67,6 @@ module pong_main
     else tick_counter <= tick_counter + 1;
   end
 
-  // Niezależny, szybki zegar dla pocisku
   reg [31:0] bullet_tick_counter;
   wire bullet_tick = (bullet_tick_counter >= BULLET_SPEED);
 
@@ -80,7 +77,7 @@ module pong_main
   end
 
   //-----------------------------------------
-  // OBSŁUGA ENKODERA (STEROWANIE GRACZEM)
+  // OBSŁUGA ENKODERA
   //-----------------------------------------
   reg EncA_QA_d, EncA_QA_dd, EncA_QB_d;
   always @(posedge CLK) begin
@@ -94,7 +91,7 @@ module pong_main
   wire move_left  = enc_tick && (EncA_QB_d == 1'b1);
 
   //-----------------------------------------
-  // AUTOMATYCZNE STRZELANIE (TIMER)
+  // AUTOMATYCZNE STRZELANIE
   //-----------------------------------------
   reg [27:0] shoot_timer;
   always @(posedge CLK or posedge RST) begin
@@ -106,8 +103,11 @@ module pong_main
   wire auto_shoot_tick = (shoot_timer == 0);
 
   //-----------------------------------------
-  // LOGIKA GRY (KOLIZJE, PUNKTY I GAME OVER)
+  // GŁÓWNA LOGIKA GRY (Z MENU)
   //-----------------------------------------
+  reg in_menu;
+  reg game_over; 
+
   reg [10:0] player_x, player_y;
   reg [10:0] bullet_x, bullet_y; 
   reg bullet_active;             
@@ -118,54 +118,45 @@ module pong_main
   reg [3:0] alien_tick_div;
   
   reg [3:0] score_thousands, score_hundreds, score_tens, score_ones;
-  reg game_over; 
   
   integer j;
 
   always @(posedge CLK or posedge RST) begin
     if(RST) begin
-      player_x <= SCR_W/2 - (PLAYER_W/2);
-      player_y <= SCR_H - PLAYER_H - 2; 
-      
-      bullet_active <= 0; bullet_x <= 0; bullet_y <= 0;
-
-      fleet_x <= 10;
-      fleet_y <= 6; fleet_dir <= 0;
-      alien_alive <= 4'b1111; 
-      alien_tick_div <= 0;
-
-      score_thousands <= 0; score_hundreds <= 0;
-      score_tens <= 0; score_ones <= 0;
-      level <= 0; game_over <= 0;
+      in_menu <= 1;
+      game_over <= 0;
     end
-    else if (game_over) begin
-      // RESTART GRY PO PORAŻCE
-      if (move_right || move_left) begin
+    else if (in_menu) begin
+      if (move_right) begin
+        in_menu <= 0;
+        
         player_x <= SCR_W/2 - (PLAYER_W/2);
-        bullet_active <= 0;
-        
+        player_y <= SCR_H - PLAYER_H - 2; 
+        bullet_active <= 0; bullet_x <= 0; bullet_y <= 0;
         fleet_x <= 10; fleet_y <= 6; fleet_dir <= 0;
-        alien_alive <= 4'b1111;
-        
-        score_thousands <= 0;
-        score_hundreds <= 0;
+        alien_alive <= 4'b1111; 
+        alien_tick_div <= 0;
+        score_thousands <= 0; score_hundreds <= 0;
         score_tens <= 0; score_ones <= 0;
         level <= 0; game_over <= 0;
       end
     end
+    else if (game_over) begin
+      if (move_right || move_left) begin
+        in_menu <= 1;
+        game_over <= 0;
+      end
+    end
     else begin
-      // Sterowanie
       if (move_right && player_x < SCR_W - PLAYER_W) player_x <= player_x + 1;
       else if (move_left && player_x > 0)            player_x <= player_x - 1;
 
-      // Strzał
       if (auto_shoot_tick && !bullet_active) begin
         bullet_active <= 1;
         bullet_x <= player_x + (PLAYER_W / 2); 
         bullet_y <= player_y - 1;
       end
 
-      // Kolizje
       if (bullet_active) begin
         for (j = 0; j < 4; j = j + 1) begin
           if (alien_alive[j] && 
@@ -175,7 +166,6 @@ module pong_main
                 alien_alive[j] <= 0;
                 bullet_active <= 0;  
                 
-                // Naliczanie punktów
                 if (score_ones == 9) begin
                   score_ones <= 0;
                   if (score_tens == 9) begin
@@ -190,7 +180,6 @@ module pong_main
         end
       end
 
-      // Przejście na następny poziom
       if (alien_alive == 4'b0000) begin
         alien_alive <= 4'b1111;
         fleet_x <= 10;
@@ -199,12 +188,10 @@ module pong_main
         if (level < 9) level <= level + 1;
       end
 
-      // Warunek porażki
       if (fleet_y + ALIEN_H >= player_y) begin
         game_over <= 1;
       end
 
-      // NIEZALEŻNY RUCH POCISKU
       if (bullet_tick) begin
         if (bullet_active) begin
           if (bullet_y > 0) bullet_y <= bullet_y - 1;
@@ -212,7 +199,6 @@ module pong_main
         end
       end
 
-      // RUCH KOSMITÓW
       if(game_tick) begin
         alien_tick_div <= alien_tick_div + 1;
         if (alien_tick_div == 0) begin
@@ -237,47 +223,86 @@ module pong_main
   //-----------------------------------------
   // RENDEROWANIE TEKSTU I GWIAZD
   //-----------------------------------------
-  wire is_score_thou  = (H_CNT >= 48 && H_CNT <= 50 && V_CNT >= 1 && V_CNT <= 5);
-  wire is_score_hund  = (H_CNT >= 52 && H_CNT <= 54 && V_CNT >= 1 && V_CNT <= 5);
-  wire is_score_tens  = (H_CNT >= 56 && H_CNT <= 58 && V_CNT >= 1 && V_CNT <= 5);
-  wire is_score_ones  = (H_CNT >= 60 && H_CNT <= 62 && V_CNT >= 1 && V_CNT <= 5);
-  wire is_char_L      = (H_CNT >= 2  && H_CNT <= 4  && V_CNT >= 1 && V_CNT <= 5);
-  wire is_level_digit = (H_CNT >= 6  && H_CNT <= 8  && V_CNT >= 1 && V_CNT <= 5);
-  wire is_text_area = is_score_thou | is_score_hund | is_score_tens | is_score_ones | is_char_L | is_level_digit;
+  wire is_score_thou  = (!in_menu) && (H_CNT >= 48 && H_CNT <= 50 && V_CNT >= 1 && V_CNT <= 5);
+  wire is_score_hund  = (!in_menu) && (H_CNT >= 52 && H_CNT <= 54 && V_CNT >= 1 && V_CNT <= 5);
+  wire is_score_tens  = (!in_menu) && (H_CNT >= 56 && H_CNT <= 58 && V_CNT >= 1 && V_CNT <= 5);
+  wire is_score_ones  = (!in_menu) && (H_CNT >= 60 && H_CNT <= 62 && V_CNT >= 1 && V_CNT <= 5);
+  wire is_char_L      = (!in_menu) && (H_CNT >= 2  && H_CNT <= 4  && V_CNT >= 1 && V_CNT <= 5);
+  wire is_level_digit = (!in_menu) && (H_CNT >= 6  && H_CNT <= 8  && V_CNT >= 1 && V_CNT <= 5);
   
-  wire [3:0] cur_digit = is_score_thou  ? score_thousands :
-                         is_score_hund  ? score_hundreds  :
-                         is_score_tens  ? score_tens      :
-                         is_score_ones  ? score_ones      :
-                         is_char_L      ? 4'd10           : 
-                         is_level_digit ? level           : 4'd0;
+  wire is_menu_J  = in_menu && (H_CNT >= 24 && H_CNT <= 29 && V_CNT >= 8 && V_CNT <= 17);
+  wire is_menu_D  = in_menu && (H_CNT >= 34 && H_CNT <= 39 && V_CNT >= 8 && V_CNT <= 17);
+  
+  wire is_menu_S  = in_menu && (H_CNT >= 23 && H_CNT <= 25 && V_CNT >= 25 && V_CNT <= 29);
+  wire is_menu_T1 = in_menu && (H_CNT >= 27 && H_CNT <= 29 && V_CNT >= 25 && V_CNT <= 29);
+  wire is_menu_A  = in_menu && (H_CNT >= 31 && H_CNT <= 33 && V_CNT >= 25 && V_CNT <= 29);
+  wire is_menu_R  = in_menu && (H_CNT >= 35 && H_CNT <= 37 && V_CNT >= 25 && V_CNT <= 29);
+  wire is_menu_T2 = in_menu && (H_CNT >= 39 && H_CNT <= 41 && V_CNT >= 25 && V_CNT <= 29);
+
+  wire is_menu_text = is_menu_J | is_menu_D | is_menu_S | is_menu_T1 | is_menu_A | is_menu_R | is_menu_T2;
+  wire is_hud_text  = is_score_thou | is_score_hund | is_score_tens | is_score_ones | is_char_L | is_level_digit;
+  wire is_text_area = in_menu ? is_menu_text : is_hud_text;
+
+  reg [4:0] cur_digit;
+  reg [2:0] char_x;
+  reg [2:0] char_y;
+
+  always @(*) begin
+    cur_digit = 0; char_x = 0; char_y = 0;
+    if (in_menu) begin
+      if (is_menu_J) begin 
+        cur_digit = 11; 
+        char_x = (H_CNT - 24) >> 1; 
+        char_y = (V_CNT - 8) >> 1; 
+      end
+      else if (is_menu_D) begin 
+        cur_digit = 12; 
+        char_x = (H_CNT - 34) >> 1; 
+        char_y = (V_CNT - 8) >> 1; 
+      end
+      else begin
+        char_y = V_CNT - 25;
+        if      (is_menu_S)  begin cur_digit = 5;  char_x = H_CNT - 23; end 
+        else if (is_menu_T1) begin cur_digit = 14; char_x = H_CNT - 27; end
+        else if (is_menu_A)  begin cur_digit = 15; char_x = H_CNT - 31; end
+        else if (is_menu_R)  begin cur_digit = 16; char_x = H_CNT - 35; end
+        else if (is_menu_T2) begin cur_digit = 14; char_x = H_CNT - 39; end
+      end
+    end 
+    else begin
+      char_y = V_CNT - 1;
+      if      (is_score_thou)  begin cur_digit = score_thousands; char_x = H_CNT - 48; end
+      else if (is_score_hund)  begin cur_digit = score_hundreds;  char_x = H_CNT - 52; end
+      else if (is_score_tens)  begin cur_digit = score_tens;      char_x = H_CNT - 56; end
+      else if (is_score_ones)  begin cur_digit = score_ones;      char_x = H_CNT - 60; end
+      else if (is_char_L)      begin cur_digit = 10;              char_x = H_CNT - 2;  end
+      else if (is_level_digit) begin cur_digit = level;           char_x = H_CNT - 6;  end
+    end
+  end
 
   reg [14:0] digit_rom;
   always @(*) begin
     case(cur_digit)
-      4'd0: digit_rom = 15'b111_101_101_101_111;
-      4'd1: digit_rom = 15'b010_110_010_010_111;
-      4'd2: digit_rom = 15'b111_001_111_100_111;
-      4'd3: digit_rom = 15'b111_001_111_001_111;
-      4'd4: digit_rom = 15'b101_101_111_001_001;
-      4'd5: digit_rom = 15'b111_100_111_001_111;
-      4'd6: digit_rom = 15'b111_100_111_101_111;
-      4'd7: digit_rom = 15'b111_001_001_001_001;
-      4'd8: digit_rom = 15'b111_101_111_101_111;
-      4'd9: digit_rom = 15'b111_101_111_001_111;
-      4'd10: digit_rom= 15'b100_100_100_100_111; 
+      5'd0: digit_rom = 15'b111_101_101_101_111;
+      5'd1: digit_rom = 15'b010_110_010_010_111;
+      5'd2: digit_rom = 15'b111_001_111_100_111;
+      5'd3: digit_rom = 15'b111_001_111_001_111;
+      5'd4: digit_rom = 15'b101_101_111_001_001;
+      5'd5: digit_rom = 15'b111_100_111_001_111; 
+      5'd6: digit_rom = 15'b111_100_111_101_111;
+      5'd7: digit_rom = 15'b111_001_001_001_001;
+      5'd8: digit_rom = 15'b111_101_111_101_111;
+      5'd9: digit_rom = 15'b111_101_111_001_111;
+      5'd10: digit_rom= 15'b100_100_100_100_111; 
+      5'd11: digit_rom= 15'b001_001_001_101_111; 
+      5'd12: digit_rom= 15'b110_101_101_101_110; 
+      5'd14: digit_rom= 15'b111_010_010_010_010; 
+      5'd15: digit_rom= 15'b010_101_111_101_101; 
+      5'd16: digit_rom= 15'b110_101_110_101_101; 
       default: digit_rom = 15'b000_000_000_000_000;
     endcase
   end
 
-  wire [2:0] char_x = is_score_thou  ? (H_CNT - 48) :
-                      is_score_hund  ? (H_CNT - 52) :
-                      is_score_tens  ? (H_CNT - 56) :
-                      is_score_ones  ? (H_CNT - 60) :
-                      is_char_L      ? (H_CNT - 2)  :
-                      is_level_digit ? (H_CNT - 6)  : 3'd0;
-
-  wire [2:0] char_y = V_CNT - 1;
   wire [4:0] bit_idx = 14 - (char_y * 3 + char_x); 
   
   reg draw_text_pixel;
@@ -288,10 +313,8 @@ module pong_main
     end
   end
 
-  wire blink_state = heartbeat[16]; 
-  wire show_score = (!game_over) || blink_state;
-  
-  // Statyczna mapa gwiazd
+  wire blink_hud = (!game_over) || heartbeat[16]; 
+
   wire is_star = (H_CNT == 3  && V_CNT == 8 ) || (H_CNT == 12 && V_CNT == 4 ) ||
                  (H_CNT == 27 && V_CNT == 2 ) || (H_CNT == 42 && V_CNT == 6 ) ||
                  (H_CNT == 58 && V_CNT == 3 ) || (H_CNT == 8  && V_CNT == 14) ||
@@ -308,44 +331,56 @@ module pong_main
   //-----------------------------------------
   integer i;
   always @(*) begin
-    // Tło z gwiazdami
+    // Tło (gwiazdy)
     if (is_star) begin
-        RED = 8'hFF; GREEN = 8'hFF; BLUE = 8'hFF; // Białe gwiazdy
+        RED = 8'hFF; GREEN = 8'hFF; BLUE = 8'hFF;
     end else begin
-        RED = 8'h00; GREEN = 8'h00; BLUE = 8'h00; // Czerń
+        RED = 8'h00; GREEN = 8'h00; BLUE = 8'h00;
     end
 
-    // Flota kosmitów
-    for (i = 0; i < 4; i = i + 1) begin
-      if (alien_alive[i]) begin
-        if (H_CNT >= fleet_x + (i * 8) && H_CNT < fleet_x + (i * 8) + ALIEN_W && 
-            V_CNT >= fleet_y && V_CNT < fleet_y + ALIEN_H) begin
-          RED = 8'h00; GREEN = 8'hFF; BLUE = 8'h00; // Zieloni
+    if (in_menu) begin
+      // Szare tło przycisku "START" (dodatkowe 2 piksele marginesu z każdej strony)
+      if (H_CNT >= 21 && H_CNT <= 43 && V_CNT >= 23 && V_CNT <= 31) begin
+          RED = 8'h60; GREEN = 8'h60; BLUE = 8'h60; // Klasyczna szarość
+      end
+      
+      if (draw_text_pixel) begin
+        if (is_menu_J || is_menu_D) begin
+          RED = 8'h00; GREEN = 8'hFF; BLUE = 8'hFF; // Cyjanowe logo JD
+        end else begin
+          RED = 8'hFF; GREEN = 8'hFF; BLUE = 8'h00; // Żółty napis START (statyczny)
         end
       end
-    end
-
-    // Gracz
-    if(H_CNT >= player_x && H_CNT < player_x + PLAYER_W && V_CNT >= player_y && V_CNT < player_y + PLAYER_H) begin
-      if (game_over) begin
-         RED = 8'hFF; GREEN = 8'h00; BLUE = 8'h00; // Czerwony jak zniszczony
-      end else begin
-         if (H_CNT == player_x + 2 && V_CNT == player_y) begin
-           RED = 8'h00; GREEN = 8'hFF; BLUE = 8'hFF; 
-         end else begin
-           RED = 8'h00; GREEN = 8'h00; BLUE = 8'hFF;
-         end
+    end 
+    else begin
+      for (i = 0; i < 4; i = i + 1) begin
+        if (alien_alive[i]) begin
+          if (H_CNT >= fleet_x + (i * 8) && H_CNT < fleet_x + (i * 8) + ALIEN_W && 
+              V_CNT >= fleet_y && V_CNT < fleet_y + ALIEN_H) begin
+            RED = 8'h00; GREEN = 8'hFF; BLUE = 8'h00; 
+          end
+        end
       end
-    end
 
-    // Pocisk
-    if (bullet_active && H_CNT == bullet_x && V_CNT == bullet_y) begin
-        RED = 8'hFF; GREEN = 8'hFF; BLUE = 8'h00; // Żółty/Biały pocisk
-    end
+      if(H_CNT >= player_x && H_CNT < player_x + PLAYER_W && V_CNT >= player_y && V_CNT < player_y + PLAYER_H) begin
+        if (game_over) begin
+           RED = 8'hFF; GREEN = 8'h00; BLUE = 8'h00; 
+        end else begin
+           if (H_CNT == player_x + 2 && V_CNT == player_y) begin
+             RED = 8'h00; GREEN = 8'hFF; BLUE = 8'hFF; 
+           end else begin
+             RED = 8'h00; GREEN = 8'h00; BLUE = 8'hFF;
+           end
+        end
+      end
 
-    // UI
-    if (draw_text_pixel && show_score) begin
-        RED = 8'hFF; GREEN = 8'hFF; BLUE = 8'h00;
+      if (bullet_active && H_CNT == bullet_x && V_CNT == bullet_y) begin
+          RED = 8'hFF; GREEN = 8'hFF; BLUE = 8'h00;
+      end
+
+      if (draw_text_pixel && blink_hud) begin
+          RED = 8'hFF; GREEN = 8'hFF; BLUE = 8'h00;
+      end
     end
   end
 endmodule
