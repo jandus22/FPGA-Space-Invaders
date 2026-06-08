@@ -7,7 +7,13 @@ module pong_main
   parameter ALIEN_W = 3,
   parameter ALIEN_H = 3,
   parameter SHOOT_RATE = 10_000, 
-  parameter BULLET_SPEED = 800   
+  parameter BULLET_SPEED = 800,
+  // ZEGARY DLA DEMO
+  //parameter MENU_WAIT_TIME = 50_000, // Na płytkę FPGA zmień na: 375_000_000 (5 sekund przy zegarze 75MHz)
+  //parameter DEMO_LOOP_TIME = 100_000 // Na płytkę FPGA zmień na: 750_000_000 (10 sekund przy zegarze 75MHz)
+  parameter MENU_WAIT_TIME = 400_000, // Na płytkę FPGA zmień na: 375_000_000 (5 sekund przy zegarze 75MHz)
+  parameter DEMO_LOOP_TIME = 800_000 // Na płytkę FPGA zmień na: 750_000_000 (10 sekund przy zegarze 75MHz)
+
 )
 (
 	input wire        CLK,
@@ -103,10 +109,12 @@ module pong_main
   wire auto_shoot_tick = (shoot_timer == 0);
 
   //-----------------------------------------
-  // GŁÓWNA LOGIKA GRY (Z MENU)
+  // GŁÓWNA LOGIKA GRY (MENU, DEMO, GAME)
   //-----------------------------------------
   reg in_menu;
+  reg in_demo; 
   reg game_over; 
+  reg [31:0] demo_timer; 
 
   reg [10:0] player_x, player_y;
   reg [10:0] bullet_x, bullet_y; 
@@ -124,11 +132,15 @@ module pong_main
   always @(posedge CLK or posedge RST) begin
     if(RST) begin
       in_menu <= 1;
+      in_demo <= 0;
       game_over <= 0;
+      demo_timer <= 0;
     end
     else if (in_menu) begin
       if (move_right) begin
         in_menu <= 0;
+        in_demo <= 0;
+        demo_timer <= 0;
         
         player_x <= SCR_W/2 - (PLAYER_W/2);
         player_y <= SCR_H - PLAYER_H - 2; 
@@ -140,16 +152,67 @@ module pong_main
         score_tens <= 0; score_ones <= 0;
         level <= 0; game_over <= 0;
       end
+      else if (demo_timer >= MENU_WAIT_TIME) begin
+        in_menu <= 0;
+        in_demo <= 1;
+        demo_timer <= 0;
+
+        player_x <= SCR_W/2 - (PLAYER_W/2);
+        player_y <= SCR_H - PLAYER_H - 2; 
+        bullet_active <= 0; bullet_x <= 0; bullet_y <= 0;
+        fleet_x <= 10; fleet_y <= 6; fleet_dir <= 0;
+        alien_alive <= 4'b1111; 
+        alien_tick_div <= 0;
+        score_thousands <= 0; score_hundreds <= 0;
+        score_tens <= 0; score_ones <= 0;
+        level <= 0; game_over <= 0;
+      end
+      else begin
+        demo_timer <= demo_timer + 1;
+      end
     end
-    else if (game_over) begin
+    else if (game_over && !in_demo) begin
       if (move_right || move_left) begin
         in_menu <= 1;
         game_over <= 0;
+        demo_timer <= 0;
       end
     end
+    else if (in_demo && (move_right || move_left)) begin
+      in_menu <= 1;
+      in_demo <= 0;
+      game_over <= 0;
+      demo_timer <= 0;
+    end
+    else if (in_demo && (demo_timer >= DEMO_LOOP_TIME || game_over)) begin
+      demo_timer <= 0;
+      game_over <= 0;
+      
+      player_x <= SCR_W/2 - (PLAYER_W/2);
+      player_y <= SCR_H - PLAYER_H - 2; 
+      bullet_active <= 0; bullet_x <= 0; bullet_y <= 0;
+      fleet_x <= 10; fleet_y <= 6; fleet_dir <= 0;
+      alien_alive <= 4'b1111; 
+      alien_tick_div <= 0;
+      score_thousands <= 0; score_hundreds <= 0;
+      score_tens <= 0; score_ones <= 0;
+      level <= 0; 
+    end
     else begin
-      if (move_right && player_x < SCR_W - PLAYER_W) player_x <= player_x + 1;
-      else if (move_left && player_x > 0)            player_x <= player_x - 1;
+      
+      if (in_demo) demo_timer <= demo_timer + 1;
+
+      if (!in_demo) begin
+        if (move_right && player_x < SCR_W - PLAYER_W) player_x <= player_x + 1;
+        else if (move_left && player_x > 0)            player_x <= player_x - 1;
+      end 
+      else begin
+        // AI dla Demo
+        if (game_tick) begin
+           if (player_x + 2 < fleet_x + 12 && player_x < SCR_W - PLAYER_W) player_x <= player_x + 1;
+           else if (player_x + 2 > fleet_x + 12 && player_x > 0) player_x <= player_x - 1;
+        end
+      end
 
       if (auto_shoot_tick && !bullet_active) begin
         bullet_active <= 1;
@@ -239,9 +302,17 @@ module pong_main
   wire is_menu_R  = in_menu && (H_CNT >= 35 && H_CNT <= 37 && V_CNT >= 25 && V_CNT <= 29);
   wire is_menu_T2 = in_menu && (H_CNT >= 39 && H_CNT <= 41 && V_CNT >= 25 && V_CNT <= 29);
 
+  // NOWOŚĆ: Napis DEMO (wyświetlany tylko w trybie demo) - Idealnie wyśrodkowany
+  wire is_demo_D = in_demo && (H_CNT >= 25 && H_CNT <= 27 && V_CNT >= 18 && V_CNT <= 22);
+  wire is_demo_E = in_demo && (H_CNT >= 29 && H_CNT <= 31 && V_CNT >= 18 && V_CNT <= 22);
+  wire is_demo_M = in_demo && (H_CNT >= 33 && H_CNT <= 35 && V_CNT >= 18 && V_CNT <= 22);
+  wire is_demo_O = in_demo && (H_CNT >= 37 && H_CNT <= 39 && V_CNT >= 18 && V_CNT <= 22);
+
   wire is_menu_text = is_menu_J | is_menu_D | is_menu_S | is_menu_T1 | is_menu_A | is_menu_R | is_menu_T2;
   wire is_hud_text  = is_score_thou | is_score_hund | is_score_tens | is_score_ones | is_char_L | is_level_digit;
-  wire is_text_area = in_menu ? is_menu_text : is_hud_text;
+  wire is_demo_text = is_demo_D | is_demo_E | is_demo_M | is_demo_O;
+  
+  wire is_text_area = in_menu ? is_menu_text : (is_hud_text | is_demo_text);
 
   reg [4:0] cur_digit;
   reg [2:0] char_x;
@@ -270,20 +341,28 @@ module pong_main
       end
     end 
     else begin
-      char_y = V_CNT - 1;
+      char_y = V_CNT - 1; // Domyślnie HUD
+      
       if      (is_score_thou)  begin cur_digit = score_thousands; char_x = H_CNT - 48; end
       else if (is_score_hund)  begin cur_digit = score_hundreds;  char_x = H_CNT - 52; end
       else if (is_score_tens)  begin cur_digit = score_tens;      char_x = H_CNT - 56; end
       else if (is_score_ones)  begin cur_digit = score_ones;      char_x = H_CNT - 60; end
       else if (is_char_L)      begin cur_digit = 10;              char_x = H_CNT - 2;  end
       else if (is_level_digit) begin cur_digit = level;           char_x = H_CNT - 6;  end
+      else if (in_demo) begin
+        char_y = V_CNT - 18; // Wysokość dla napisu DEMO
+        if      (is_demo_D) begin cur_digit = 12; char_x = H_CNT - 25; end
+        else if (is_demo_E) begin cur_digit = 17; char_x = H_CNT - 29; end
+        else if (is_demo_M) begin cur_digit = 18; char_x = H_CNT - 33; end
+        else if (is_demo_O) begin cur_digit = 0;  char_x = H_CNT - 37; end
+      end
     end
   end
 
   reg [14:0] digit_rom;
   always @(*) begin
     case(cur_digit)
-      5'd0: digit_rom = 15'b111_101_101_101_111;
+      5'd0: digit_rom = 15'b111_101_101_101_111; // 0 (i O)
       5'd1: digit_rom = 15'b010_110_010_010_111;
       5'd2: digit_rom = 15'b111_001_111_100_111;
       5'd3: digit_rom = 15'b111_001_111_001_111;
@@ -293,12 +372,14 @@ module pong_main
       5'd7: digit_rom = 15'b111_001_001_001_001;
       5'd8: digit_rom = 15'b111_101_111_101_111;
       5'd9: digit_rom = 15'b111_101_111_001_111;
-      5'd10: digit_rom= 15'b100_100_100_100_111; 
-      5'd11: digit_rom= 15'b001_001_001_101_111; 
-      5'd12: digit_rom= 15'b110_101_101_101_110; 
-      5'd14: digit_rom= 15'b111_010_010_010_010; 
-      5'd15: digit_rom= 15'b010_101_111_101_101; 
-      5'd16: digit_rom= 15'b110_101_110_101_101; 
+      5'd10: digit_rom= 15'b100_100_100_100_111; // L
+      5'd11: digit_rom= 15'b001_001_001_101_111; // J
+      5'd12: digit_rom= 15'b110_101_101_101_110; // D
+      5'd14: digit_rom= 15'b111_010_010_010_010; // T
+      5'd15: digit_rom= 15'b010_101_111_101_101; // A
+      5'd16: digit_rom= 15'b110_101_110_101_101; // R
+      5'd17: digit_rom= 15'b111_100_111_100_111; // E
+      5'd18: digit_rom= 15'b101_111_101_101_101; // M
       default: digit_rom = 15'b000_000_000_000_000;
     endcase
   end
@@ -331,7 +412,6 @@ module pong_main
   //-----------------------------------------
   integer i;
   always @(*) begin
-    // Tło (gwiazdy)
     if (is_star) begin
         RED = 8'hFF; GREEN = 8'hFF; BLUE = 8'hFF;
     end else begin
@@ -339,20 +419,20 @@ module pong_main
     end
 
     if (in_menu) begin
-      // Szare tło przycisku "START" (dodatkowe 2 piksele marginesu z każdej strony)
       if (H_CNT >= 21 && H_CNT <= 43 && V_CNT >= 23 && V_CNT <= 31) begin
-          RED = 8'h60; GREEN = 8'h60; BLUE = 8'h60; // Klasyczna szarość
+          RED = 8'h60; GREEN = 8'h60; BLUE = 8'h60; 
       end
       
       if (draw_text_pixel) begin
         if (is_menu_J || is_menu_D) begin
-          RED = 8'h00; GREEN = 8'hFF; BLUE = 8'hFF; // Cyjanowe logo JD
+          RED = 8'h00; GREEN = 8'hFF; BLUE = 8'hFF; 
         end else begin
-          RED = 8'hFF; GREEN = 8'hFF; BLUE = 8'h00; // Żółty napis START (statyczny)
+          RED = 8'hFF; GREEN = 8'hFF; BLUE = 8'h00;
         end
       end
     end 
     else begin
+      // Kosmici
       for (i = 0; i < 4; i = i + 1) begin
         if (alien_alive[i]) begin
           if (H_CNT >= fleet_x + (i * 8) && H_CNT < fleet_x + (i * 8) + ALIEN_W && 
@@ -362,6 +442,7 @@ module pong_main
         end
       end
 
+      // Gracz
       if(H_CNT >= player_x && H_CNT < player_x + PLAYER_W && V_CNT >= player_y && V_CNT < player_y + PLAYER_H) begin
         if (game_over) begin
            RED = 8'hFF; GREEN = 8'h00; BLUE = 8'h00; 
@@ -374,12 +455,19 @@ module pong_main
         end
       end
 
+      // Pocisk
       if (bullet_active && H_CNT == bullet_x && V_CNT == bullet_y) begin
           RED = 8'hFF; GREEN = 8'hFF; BLUE = 8'h00;
       end
 
-      if (draw_text_pixel && blink_hud) begin
-          RED = 8'hFF; GREEN = 8'hFF; BLUE = 8'h00;
+      // Teksty (HUD oraz DEMO)
+      if (draw_text_pixel) begin
+        if (in_demo && is_demo_text) begin
+          RED = 8'hFF; GREEN = 8'h00; BLUE = 8'hFF; // Magenta/Fiolet dla napisu DEMO
+        end 
+        else if (is_hud_text && blink_hud) begin
+          RED = 8'hFF; GREEN = 8'hFF; BLUE = 8'h00; // Żółty dla HUDu
+        end
       end
     end
   end

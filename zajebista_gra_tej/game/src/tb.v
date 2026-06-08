@@ -56,7 +56,9 @@ module tb();
   // GHOST PLAYER 
   initial begin
     EncA_QA = 1; EncA_QB = 1; EncB_QA = 1; EncB_QB = 1;
-    #100000; 
+    repeat (2000) begin
+      #10000;
+    end
     forever begin
       repeat(5) begin
         #20000 EncA_QA = 0; EncA_QB = 1;
